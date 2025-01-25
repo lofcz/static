@@ -29,5 +29,5 @@ jobs:
           subject: ${{ github.event.inputs.subject }}
           body: ${{ github.event.inputs.message }}
           to: ${{ github.event.inputs.recipient }}
-          from: GitHub Actions
+          from: Robot Matěje Štágla
           secure: true

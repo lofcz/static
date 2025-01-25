@@ -1,0 +1,71 @@
+name: Monitor Sciobot.cz
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      force_email:
+        type: boolean
+        description: 'Vynutit odeslání e-mailu'
+        required: false
+        default: false
+
+jobs:
+  check-website:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /ping endpoint
+        id: check_ping
+        continue-on-error: true
+        run: |
+          response=$(curl -s -w "%{http_code}" -o response.txt https://sciobot.cz/ping)
+          if [ "$response" != "200" ]; then
+            echo "ping_status=$response" >> $GITHUB_ENV
+            echo "Ping endpoint returned non-200 status code: $response"
+            exit 1
+          fi
+          echo "Ping endpoint is OK"
+
+      - name: Check main website
+        id: check_main
+        if: steps.check_ping.outcome == 'failure' || inputs.force_email
+        run: |
+          response=$(curl -s -w "%{http_code}" -o response.txt https://sciobot.cz)
+          content=$(cat response.txt)
+          
+          if grep -q "app_offline.htm" response.txt; then
+            echo "Website is in maintenance mode (app_offline.htm detected)"
+            echo "maintenance_mode=true" >> $GITHUB_ENV
+            exit 0
+          fi
+          
+          if [ "$response" != "200" ]; then
+            echo "main_status=$response" >> $GITHUB_ENV
+            echo "Main website returned non-200 status code: $response"
+            exit 1
+          fi
+          
+          echo "Main website is OK"
+
+      - name: Send notification email
+        if: (steps.check_ping.outcome == 'failure' && steps.check_main.outcome == 'failure') || inputs.force_email
+        uses: dawidd6/action-send-mail@v4
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "⚠️ Sciobot.cz není dostupný"
+          body: |
+            Dobrý den,
+            
+            kontrola dostupnosti Sciobota selhala:
+            
+            1. Endpoint /ping: ${{ env.ping_status || '200' }}
+            2. Hlavní stránka: ${{ env.main_status || '200' }}
+            ${{ env.maintenance_mode == 'true' && '(Detekován maintenance mode)' || '' }}
+            
+            ${{ github.event_name == 'workflow_dispatch' && inputs.force_email && '📍 Tato je pouze testovací zpráva, ignorujte prosím!' || 'Toto je automaticky generovaná zpráva, neodpovídejte na ni.' }}
+          to: ${{ secrets.EMAIL_RECIPIENTS }}
+          from: Robot Matěje Štágla
+          secure: true
