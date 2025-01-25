@@ -18,7 +18,7 @@ jobs:
         id: check_ping
         continue-on-error: true
         run: |
-          response=$(curl -s -w "%{http_code}" -o response.txt https://sciobot.cz/ping)
+          response=$(curl -s -w "%{http_code}" -o response.txt https://sciobot.cz/ping
           if [ "$response" != "200" ]; then
             echo "ping_status=$response" >> $GITHUB_ENV
             echo "Ping endpoint returned non-200 status code: $response"
@@ -30,7 +30,7 @@ jobs:
         id: check_main
         if: steps.check_ping.outcome == 'failure' || inputs.force_email
         run: |
-          response=$(curl -s -w "%{http_code}" -o response.txt https://sciobot.cz)
+          response=$(curl -s -w "%{http_code}" -o response.txt https://sciobot.cz
           content=$(cat response.txt)
           
           if grep -q "app_offline.htm" response.txt; then
